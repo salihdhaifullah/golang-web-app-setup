@@ -3,12 +3,51 @@ package main
 import (
 	"compress/gzip"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/jpeg"
 	"log"
 	"net/http"
 	"strings"
 	"test/build"
 	"text/template"
 )
+
+func createImage() *image.RGBA {
+	width := 800
+	height := 600
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	blue := color.RGBA{0, 0, 255, 255}
+	draw.Draw(img, img.Bounds(), &image.Uniform{blue}, image.Point{}, draw.Src)
+
+	red := color.RGBA{255, 0, 0, 255}
+	centerX, centerY := width/2, height/2
+	radius := 100
+
+	for x := -radius; x < radius; x++ {
+		for y := -radius; y < radius; y++ {
+			if x*x+y*y < radius*radius {
+				img.Set(centerX+x, centerY+y, red)
+			}
+		}
+	}
+
+	return img
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	img := createImage()
+
+	w.Header().Set("Content-Type", "image/jpeg")
+
+	err := jpeg.Encode(w, img, nil)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func gzipHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +118,7 @@ func main() {
 	router.HandleFunc("/", index_view)
 	router.HandleFunc("/hello", hello)
 	router.HandleFunc("/headers", headers)
+	router.HandleFunc("/img", handler)
 
 	http.Handle("/", gzipHandler(router))
 
