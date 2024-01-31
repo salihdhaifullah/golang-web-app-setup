@@ -1,4 +1,4 @@
-package api
+package image_processor
 
 import (
 	"fmt"

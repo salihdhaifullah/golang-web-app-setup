@@ -1,0 +1,18 @@
+package views
+
+import "github.com/salihdhaifullah/golang-web-app-setup/views/components"
+
+templ Hello(name string) {
+	<!DOCTYPE html>
+	<html>
+		@components.Head("test")
+		<body>
+			<div>Hello, { name }</div>
+		</body>
+		<script defer src="/static/index.js"></script>
+		<script>
+			const hello = ""
+			console.log(hello)
+		</script>
+	</html>
+}

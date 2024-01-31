@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"test/api"
-	"test/build"
-	"text/template"
 
+	"github.com/a-h/templ"
 	"github.com/nickalie/go-webpbin"
+
+	"github.com/salihdhaifullah/golang-web-app-setup/build"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers/image_processor"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers/initializers"
+	"github.com/salihdhaifullah/golang-web-app-setup/views"
 )
 
 type gzipResponseWriter struct {
@@ -23,7 +26,7 @@ func (grw gzipResponseWriter) Write(b []byte) (int, error) {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	img := api.CreateImage()
+	img := image_processor.CreateImage()
 	f, e := os.Create("./test.webp")
 	if e != nil {
 		log.Fatal(e)
@@ -55,38 +58,18 @@ func gzipHandler(next http.Handler) http.Handler {
 	})
 }
 
-func index_view(w http.ResponseWriter, req *http.Request) {
-	t, err := template.ParseFiles("./pages/index.html")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	data := struct {
-		Title string
-		Items []string
-	}{
-		Title: "My page",
-		Items: []string{
-			"My photos",
-			"My blog",
-		},
-	}
-
-	err = t.Execute(w, data)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 func main() {
-	build.Build()
+	initializers.GetENV()
+
+	if os.Getenv("env") != "DEV" {
+		build.Build()
+	}
 
 	router := http.NewServeMux()
 	fs := http.FileServer(http.Dir("./static"))
-	router.Handle("/static/", fs)
+	router.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	router.HandleFunc("/", index_view)
+	router.Handle("/", templ.Handler(views.Hello("salih dhaifullah")))
 	router.HandleFunc("/img", handler)
 
 	http.Handle("/", gzipHandler(router))
