@@ -2,47 +2,38 @@ package main
 
 import (
 	"compress/gzip"
-	"fmt"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/jpeg"
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"test/api"
 	"test/build"
 	"text/template"
+
+	"github.com/nickalie/go-webpbin"
 )
 
-func createImage() *image.RGBA {
-	width := 800
-	height := 600
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
+type gzipResponseWriter struct {
+	gw *gzip.Writer
+	http.ResponseWriter
+}
 
-	blue := color.RGBA{0, 0, 255, 255}
-	draw.Draw(img, img.Bounds(), &image.Uniform{blue}, image.Point{}, draw.Src)
-
-	red := color.RGBA{255, 0, 0, 255}
-	centerX, centerY := width/2, height/2
-	radius := 100
-
-	for x := -radius; x < radius; x++ {
-		for y := -radius; y < radius; y++ {
-			if x*x+y*y < radius*radius {
-				img.Set(centerX+x, centerY+y, red)
-			}
-		}
-	}
-
-	return img
+func (grw gzipResponseWriter) Write(b []byte) (int, error) {
+	return grw.gw.Write(b)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	img := createImage()
+	img := api.CreateImage()
+	f, e := os.Create("./test.webp")
+	if e != nil {
+		log.Fatal(e)
+	}
 
-	w.Header().Set("Content-Type", "image/jpeg")
+	webpbin.Encode(f, img)
 
-	err := jpeg.Encode(w, img, nil)
+	w.Header().Set("Content-Type", "image/webp")
+
+	err := webpbin.Encode(w, img)
 
 	if err != nil {
 		log.Fatal(err)
@@ -62,27 +53,6 @@ func gzipHandler(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-type gzipResponseWriter struct {
-	gw *gzip.Writer
-	http.ResponseWriter
-}
-
-func (grw gzipResponseWriter) Write(b []byte) (int, error) {
-	return grw.gw.Write(b)
-}
-
-func hello(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "hello\n")
-}
-
-func headers(w http.ResponseWriter, req *http.Request) {
-	for name, headers := range req.Header {
-		for _, h := range headers {
-			fmt.Fprintf(w, "%v: %v\n", name, h)
-		}
-	}
 }
 
 func index_view(w http.ResponseWriter, req *http.Request) {
@@ -111,13 +81,12 @@ func index_view(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	build.Build()
+
 	router := http.NewServeMux()
 	fs := http.FileServer(http.Dir("./static"))
 	router.Handle("/static/", fs)
 
 	router.HandleFunc("/", index_view)
-	router.HandleFunc("/hello", hello)
-	router.HandleFunc("/headers", headers)
 	router.HandleFunc("/img", handler)
 
 	http.Handle("/", gzipHandler(router))

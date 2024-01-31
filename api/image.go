@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/nickalie/go-webpbin"
 	"golang.org/x/image/draw"
 )
+
 
 func GenerateResizedImages(sourceImagePath, outputDirectory string) error {
 	file, err := os.Open("./static/test.jpg")
 	if err != nil {
-		log.Println("1")
 		return err
 	}
 
@@ -22,33 +22,31 @@ func GenerateResizedImages(sourceImagePath, outputDirectory string) error {
 
 	img, err := jpeg.Decode(file)
 	if err != nil {
-		log.Println("2")
 		return err
 	}
 
-	sizes := []int{100, 200, 400, 800}
+	sizes := []int{300, 450, 700, 950, 1200}
 
 	err = os.MkdirAll(outputDirectory, os.ModePerm)
 	if err != nil {
-		log.Println("3")
 		return err
 	}
 
 	for _, size := range sizes {
 		resizedImg := resizeImage(img, size)
 
-		outputPath := filepath.Join(outputDirectory, fmt.Sprintf("resized_%d.jpg", size))
+		outputPath := filepath.Join(outputDirectory, fmt.Sprintf("resized_%d.webp", size))
 
 		outputFile, err := os.Create(outputPath)
+
 		if err != nil {
-			log.Println("4")
 			return err
 		}
+
 		defer outputFile.Close()
 
-		err = jpeg.Encode(outputFile, resizedImg, nil)
+		err = webpbin.Encode(outputFile, resizedImg)
 		if err != nil {
-			log.Println("5")
 			return err
 		}
 
