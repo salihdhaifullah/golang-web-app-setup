@@ -1,79 +1,49 @@
 package main
 
 import (
-	"compress/gzip"
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"os/exec"
+	"sync"
 
 	"github.com/a-h/templ"
-	"github.com/nickalie/go-webpbin"
 
-	"github.com/salihdhaifullah/golang-web-app-setup/build"
-	"github.com/salihdhaifullah/golang-web-app-setup/helpers/image_processor"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers"
 	"github.com/salihdhaifullah/golang-web-app-setup/helpers/initializers"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers/middleware"
 	"github.com/salihdhaifullah/golang-web-app-setup/views"
 )
 
-type gzipResponseWriter struct {
-	gw *gzip.Writer
-	http.ResponseWriter
-}
-
-func (grw gzipResponseWriter) Write(b []byte) (int, error) {
-	return grw.gw.Write(b)
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	img := image_processor.CreateImage()
-	f, e := os.Create("./test.webp")
-	if e != nil {
-		log.Fatal(e)
-	}
-
-	webpbin.Encode(f, img)
-
-	w.Header().Set("Content-Type", "image/webp")
-
-	err := webpbin.Encode(w, img)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func gzipHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			w.Header().Set("Content-Encoding", "gzip")
-
-			gzw := gzip.NewWriter(w)
-			defer gzw.Close()
-
-			w = gzipResponseWriter{gzw, w}
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
 func main() {
 	initializers.GetENV()
+	cmd := exec.Command("templ", "generate")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
 
-	if os.Getenv("env") != "DEV" {
-		build.Build()
+	wg := sync.WaitGroup{};
+	wg.Add(2)
+	go helpers.WaitFor(initializers.MongoDB, &wg)
+	if os.Getenv("ENV") == "PROD" {
+		go helpers.WaitFor(helpers.Build, &wg)
+	} else {
+		go helpers.WaitFor(func () {
+			err := cmd.Run()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}, &wg)
 	}
 
-	router := http.NewServeMux()
-	fs := http.FileServer(http.Dir("./static"))
-	router.Handle("/static/", http.StripPrefix("/static/", fs))
+	wg.Wait()
 
-	router.Handle("/", templ.Handler(views.Hello("salih dhaifullah")))
-	router.HandleFunc("/img", handler)
+	mux := http.NewServeMux()
 
-	http.Handle("/", gzipHandler(router))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+	mux.Handle("/", templ.Handler(views.Hello("salih dhaifullah")))
 
-	log.Printf("server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	http.Handle("/", middleware.Gzip(mux))
+
+	initializers.Listen(mux)
 }

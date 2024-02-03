@@ -1,0 +1,16 @@
+package layout
+
+import "time"
+import "fmt"
+
+templ Footer() {
+	<footer class="flex flex-col h-12 justify-center items-center w-full">
+		<p class="text-center text-secondary">
+			Copyright ©
+			<a href="/" class="link">
+                NexusNarrative
+            </a>
+            {fmt.Sprint(time.Now().Year())}
+		</p>
+	</footer>
+}

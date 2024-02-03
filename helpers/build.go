@@ -1,4 +1,4 @@
-package build
+package helpers
 
 import (
 	"io"
@@ -30,6 +30,9 @@ var contentTypes = map[string]string{
 	".js":   "text/javascript",
 	".css":  "text/css",
 	".svg":  "image/svg+xml",
+	".png":  "image",
+	".jpeg":  "image",
+	".webp":  "image",
 }
 
 func visitFile(fp string, fi os.DirEntry, err error) error {
@@ -42,7 +45,18 @@ func visitFile(fp string, fi os.DirEntry, err error) error {
 		return nil
 	}
 
+	ext := filepath.Ext(fp)
+	FileType, ok := contentTypes[ext]
 	buildPath := filepath.Join("./dist", fp)
+
+	if FileType == "image" {
+		err := image_processor.GenerateResizedImages(fp, buildPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return nil
+	}
+
 	dir := filepath.Dir(buildPath)
 	err = os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -66,11 +80,9 @@ func visitFile(fp string, fi os.DirEntry, err error) error {
 	defer w.Close()
 	defer r.Close()
 
-	ext := filepath.Ext(fp)
-	FileType, ok := contentTypes[ext]
-
 	if !ok {
 		log.Printf("coping file from %s to %s", fp, buildPath)
+
 		_, err = io.Copy(w, r)
 		if err != nil {
 			return err
@@ -90,10 +102,5 @@ func listFiles(rootDir string) {
 }
 
 func Build() {
-	e := image_processor.GenerateResizedImages("./static/test.png", "./")
-	if e != nil {
-		log.Fatal(e)
-	}
-
 	listFiles("./static")
 }

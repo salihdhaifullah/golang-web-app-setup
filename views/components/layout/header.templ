@@ -1,0 +1,83 @@
+package layout
+
+type User struct {
+	id   string
+	name string
+	blog string
+    avatarUrl string;
+}
+
+templ Header(user *User) {
+	<header class="flex flex-row fixed top-0 w-full z-[11] justify-between items-center text-secondary bg-normal p-2 shadow-lg">
+		<div class="flex flex-row gap-2 justify-between sm:justify-normal w-full sm:w-auto">
+			<a href="/" class="flex flex-row justify-center items-center">
+				<img
+					src="/logo.svg"
+					alt="NexusNarrative"
+					title="NexusNarrative"
+					width={ 45 }
+					height={ 45 }
+				/>
+			</a>
+			<div class="flex sm:hidden flex-row gap-4">
+				<button class="flex text-secondary p-1 h-fit self-center dark:hover:bg-slate-800 hover:bg-slate-200 bg-normal justify-center cursor-pointer items-center rounded-md font-bold text-xl">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 512"><path d="M64 360a56 56 0 1 0 0 112 56 56 0 1 0 0-112zm0-160a56 56 0 1 0 0 112 56 56 0 1 0 0-112zM120 96A56 56 0 1 0 8 96a56 56 0 1 0 112 0z"></path></svg>
+				</button>
+				if user != nil {
+					<div class="flex justify-center items-center">
+						<a href={"/"+user.blog} title="your profile">
+							<img
+								class="rounded-full shadow-md object-cover"
+								width="32"
+								height="32"
+								src={ user.avatarUrl }
+								alt={ user.name }
+							/>
+						</a>
+					</div>
+				}
+			</div>
+			<div class="sm:flex hidden">
+				@user ? (
+                        <a
+                            href="/auth/login"
+                            class="w-fit h-fit place-self-center text-secondary p-1 border border-secondary hover:shadow-md bg-normal transition-all ease-in-out rounded-md text-lg flex-row flex gap-1 items-center">
+                            <BiLogIn /> <p>login</p>
+                        </a>
+                    ) : (
+                        <fetcher.Form action="api/auth/logout" method="delete" onSubmit={(e) => handelLogout(e.currentTarget)}>
+                            <ButtonBase
+                                isLoading={navigation.state === "submitting"}
+                                class="w-fit h-fit place-self-center text-secondary p-1 border border-secondary hover:shadow-md bg-normal transition-all ease-in-out rounded-md text-lg flex-row flex gap-1 items-center">
+                                <BiLogOut />
+                                <p>logout</p>
+                            </ButtonBase>
+                        </fetcher.Form>
+                    )
+			</div>
+		</div>
+		<div class="sm:flex hidden flex-row justify-center gap-4 items-center">
+			<div class="max-w-[400px]">
+				<input label="Search"/>
+			</div>
+			<button
+				onClick={ () => themeDispatch({ type: theme === "dark" ? "light" : "dark" }) }
+				class="flex dark:text-secondary p-1 dark:hover:bg-slate-800 hover:bg-slate-200 justify-center cursor-pointer items-center rounded-md text-primary font-bold text-2xl"
+			>
+				{ theme === "dark" ? <FaMoon /> : <FaSun /> }
+			</button>
+			@user ? null : (
+                    <div class="flex justify-center items-center">
+                        <a href={`/${user.blog}`} title="your profile">
+                            <img
+                                class="rounded-full shadow-md object-cover"
+                                width={32}
+                                height={32}
+                                src={user.avatarUrl}
+                                alt={user.name} />
+                        </a>
+                    </div>
+                )
+		</div>
+	</header>
+}
