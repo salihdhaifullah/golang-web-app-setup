@@ -1,0 +1,8 @@
+{
+    "ignore": ["*_templ.go"],
+    "execMap": {
+        "templ": "templ generate",
+        "go": "gotip build -mod=vendor -o main -p 4 && ./main",
+        "default": "templ generate && gotip build -mod=vendor -o main -p 4 && ./main"
+    }
+}

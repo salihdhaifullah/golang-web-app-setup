@@ -1,0 +1,4 @@
+nodemon --ignore *_templ.go
+        --exec "templ generate && gotip build -mod=vendor -o main -p 4 && ./main"
+        --signal SIGTERM
+        --ext "go,templ"
