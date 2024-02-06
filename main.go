@@ -1,127 +1,167 @@
 package main
 
 import (
-	"compress/gzip"
 	"fmt"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/jpeg"
+	"html/template"
 	"log"
 	"net/http"
-	"strings"
-	"test/build"
-	"text/template"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers/initializers"
+	"github.com/salihdhaifullah/golang-web-app-setup/helpers/middleware"
 )
 
-func createImage() *image.RGBA {
-	width := 800
-	height := 600
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-
-	blue := color.RGBA{0, 0, 255, 255}
-	draw.Draw(img, img.Bounds(), &image.Uniform{blue}, image.Point{}, draw.Src)
-
-	red := color.RGBA{255, 0, 0, 255}
-	centerX, centerY := width/2, height/2
-	radius := 100
-
-	for x := -radius; x < radius; x++ {
-		for y := -radius; y < radius; y++ {
-			if x*x+y*y < radius*radius {
-				img.Set(centerX+x, centerY+y, red)
-			}
-		}
-	}
-
-	return img
+type User struct {
+	Id        string
+	Name      string
+	Blog      string
+	AvatarUrl string
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	img := createImage()
-
-	w.Header().Set("Content-Type", "image/jpeg")
-
-	err := jpeg.Encode(w, img, nil)
-
-	if err != nil {
-		log.Fatal(err)
-	}
+type View struct {
+	Year  string
+	Title string
+	Theme string
+	Script bool
+	User  User
 }
 
-func gzipHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			w.Header().Set("Content-Encoding", "gzip")
+var Temp *template.Template
+var isProduction = true
 
-			gzw := gzip.NewWriter(w)
-			defer gzw.Close()
-
-			w = gzipResponseWriter{gzw, w}
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-type gzipResponseWriter struct {
-	gw *gzip.Writer
-	http.ResponseWriter
-}
-
-func (grw gzipResponseWriter) Write(b []byte) (int, error) {
-	return grw.gw.Write(b)
-}
-
-func hello(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "hello\n")
-}
-
-func headers(w http.ResponseWriter, req *http.Request) {
-	for name, headers := range req.Header {
-		for _, h := range headers {
-			fmt.Fprintf(w, "%v: %v\n", name, h)
-		}
-	}
-}
-
-func index_view(w http.ResponseWriter, req *http.Request) {
-	t, err := template.ParseFiles("./pages/index.html")
+func init() {
+	initializers.GetENV()
+	temp, err := template.ParseGlob("./views/*.html")
+	Temp = temp
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	data := struct {
-		Title string
-		Items []string
-	}{
-		Title: "My page",
-		Items: []string{
-			"My photos",
-			"My blog",
+	isProduction = os.Getenv("ENV") == "PROD"
+}
+
+// BUG: cant serve static files from "/"
+
+func HomeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	data := View{
+		Year:  fmt.Sprint(time.Now().Year()),
+		Title: "test title",
+		Theme: "dark",
+		User: User{
+			Id:        "1",
+			Blog:      "SD-DEV",
+			AvatarUrl: "https://templ.guide/img/logo.svg",
+			Name:      "salih dhaifullah",
 		},
 	}
 
-	err = t.Execute(w, data)
-	if err != nil {
-		log.Fatal(err)
+	SendView(w, data, "index")
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	data := View{
+		Year:  fmt.Sprint(time.Now().Year()),
+		Title: "test title",
+		Theme: "dark",
+		User: User{
+			Id:        "1",
+			Blog:      "SD-DEV",
+			AvatarUrl: "https://templ.guide/img/logo.svg",
+			Name:      "salih dhaifullah",
+		},
+	}
+
+	SendView(w, data, "login")
+}
+
+func BlogHandler(w http.ResponseWriter, r *http.Request) {
+	data := View{
+		Year:  fmt.Sprint(time.Now().Year()),
+		Title: "test title",
+		Theme: "dark",
+		Script: true,
+		User: User{
+			Id:        "1",
+			Blog:      mux.Vars(r)["blog"],
+			AvatarUrl: "https://templ.guide/img/logo.svg",
+			Name:      "salih dhaifullah",
+		},
+	}
+
+	SendView(w, data, "blog")
+}
+
+func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	data := View{
+		Year:  fmt.Sprint(time.Now().Year()),
+		Title: "test title",
+		Theme: "dark",
+		User: User{
+			Id:        "1",
+			Blog:      "test",
+			AvatarUrl: "https://templ.guide/img/logo.svg",
+			Name:      "salih dhaifullah",
+		},
+	}
+
+	SendView(w, data, "404")
+}
+
+
+func main() {
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	go helpers.WaitFor(initializers.MongoDB, &wg)
+	if isProduction {
+		wg.Add(1)
+		go helpers.WaitFor(helpers.Build, &wg)
+	}
+	wg.Wait()
+
+	router := mux.NewRouter()
+	router.NotFoundHandler = http.HandlerFunc(NotFoundHandler)
+	http.Handle("/", middleware.Gzip(router))
+
+	router.HandleFunc("/", HomeHandler).Methods("GET")
+    router.HandleFunc("/login", LoginHandler).Methods("GET")
+    router.HandleFunc("/{blog}", BlogHandler).Methods("GET")
+	router.PathPrefix("/static").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static")))).Methods("GET")
+
+	initializers.Listen()
+}
+
+func SendView(w http.ResponseWriter, data interface{}, name string) {
+	if isProduction {
+		err := Temp.ExecuteTemplate(w, name, data)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		Temp, err := template.ParseGlob("./views/*.html")
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = Temp.ExecuteTemplate(w, name, data)
+
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
-func main() {
-	build.Build()
-	router := http.NewServeMux()
-	fs := http.FileServer(http.Dir("./static"))
-	router.Handle("/static/", fs)
 
-	router.HandleFunc("/", index_view)
-	router.HandleFunc("/hello", hello)
-	router.HandleFunc("/headers", headers)
-	router.HandleFunc("/img", handler)
 
-	http.Handle("/", gzipHandler(router))
-
-	log.Printf("server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
-}
