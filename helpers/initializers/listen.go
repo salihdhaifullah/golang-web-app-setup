@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func Listen(mux *http.ServeMux) {
+func Listen() {
 	var port string = "8080"
 
 	if len(os.Getenv("PORT")) > 1 {
@@ -22,5 +22,5 @@ func Listen(mux *http.ServeMux) {
 		fmt.Printf("App listen in \"http://localhost:%s\"\n\n", port)
 	}
 
-	log.Fatal(http.ListenAndServe(addr, mux))
+	log.Fatal(http.ListenAndServe(addr, nil))
 }

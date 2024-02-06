@@ -1,6 +1,7 @@
 .bin
 .env
 *_templ.go
+*_templ.txt
 tmp
 vendor
 main
